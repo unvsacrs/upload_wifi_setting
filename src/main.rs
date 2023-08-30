@@ -35,26 +35,28 @@ fn select_serialport() -> Option<String> {
 }
 
 fn write_data(name: String, data: &Vec<u8>) -> bool {
-    match serialport::new(name, 0).timeout(Duration::from_millis(100)).open() {
+    match serialport::new(name, 115200)
+    .stop_bits(serialport::StopBits::One)
+    .data_bits(serialport::DataBits::Eight)
+    .parity(serialport::Parity::None)
+    .timeout(Duration::from_millis(10000)).open() {
         Ok(mut port) => {
-            let start: [u8; 1] = [2];
-            let _ = port.write(&start);
+            let start = 2;
+            port.write(&[start]).expect("ポートに書き込めません");
             thread::sleep(Duration::from_millis(500));
     
-            match port.write(&data) {
-                Ok(_) => {
-                    thread::sleep(Duration::from_millis(500));
-                    let end: [u8; 1] = [3];
-                    let _ = port.write(&end);
-
-                },
-                Err(_) => {
-                    false;
-                }
+            for &byte in data.iter() {
+                port.write(&[byte]).expect("ポートに書き込めません");
+                thread::sleep(Duration::from_millis(10));
             }
+
+            thread::sleep(Duration::from_millis(500));
+            let end = 3;
+            port.write(&[end]).expect("ポートに書き込めません");
         },
         Err(_) => {
-            false;
+            println!("ポートを開けません");
+            return false;
         }
     }
     true
@@ -80,7 +82,7 @@ fn main() {
                     match file.read_to_end(&mut buffer) {
                         Ok(_) => {
                             println!("{}", String::from_utf8(buffer.clone()).unwrap());
-                            if write_data(portanme.clone(), &buffer) {
+                            if write_data(portanme, &buffer) {
                                 println!("設定送信完了しました");
 
                             } else {
